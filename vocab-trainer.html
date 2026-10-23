@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vocab Trainer</title>
+<style>
+  :root {
+    --bg: #f4f6fb;
+    --card: #ffffff;
+    --ink: #1c2333;
+    --muted: #6b7385;
+    --line: #e3e7f0;
+    --accent: #4f6df5;
+    --green: #22a55e;
+    --green-bg: #e9f8f0;
+    --red: #e04f4f;
+    --red-bg: #fdefef;
+    --yellow: #c98a06;
+    --yellow-bg: #fdf6e3;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: var(--bg); color: var(--ink);
+    min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+    padding: 24px 16px 48px;
+  }
+  header {
+    width: 100%; max-width: 640px; display: flex; flex-wrap: wrap;
+    align-items: center; gap: 12px; margin-bottom: 18px;
+  }
+  header h1 { font-size: 1.25rem; margin-right: auto; }
+  .pill {
+    background: var(--card); border: 1px solid var(--line); border-radius: 999px;
+    padding: 6px 14px; font-size: .8rem; color: var(--muted);
+  }
+  .pill b { color: var(--ink); }
+  select {
+    background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+    padding: 7px 10px; font-size: .85rem; color: var(--ink); cursor: pointer;
+  }
+  .toggle {
+    display: flex; align-items: center; gap: 8px; cursor: pointer;
+    background: var(--card); border: 1px solid var(--line); border-radius: 999px;
+    padding: 6px 14px; font-size: .85rem; user-select: none;
+  }
+  .toggle .knob {
+    width: 34px; height: 18px; border-radius: 999px; background: #cdd3e0;
+    position: relative; transition: background .2s;
+  }
+  .toggle .knob::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px;
+    border-radius: 50%; background: #fff; transition: left .2s;
+  }
+  .toggle.on .knob { background: var(--accent); }
+  .toggle.on .knob::after { left: 18px; }
+
+  #card {
+    width: 100%; max-width: 640px; background: var(--card);
+    border: 1px solid var(--line); border-radius: 16px;
+    padding: 32px 32px 28px; box-shadow: 0 4px 18px rgba(28,35,51,.06);
+  }
+  .progress-track {
+    height: 6px; background: var(--line); border-radius: 999px; overflow: hidden;
+    margin-bottom: 24px;
+  }
+  .progress-fill { height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+  .pos {
+    display: inline-block; font-size: .75rem; font-weight: 600; letter-spacing: .05em;
+    color: var(--accent); background: #eef1fe; border-radius: 6px;
+    padding: 3px 9px; margin-bottom: 14px; text-transform: uppercase;
+  }
+  .definition { font-size: 1.15rem; line-height: 1.55; }
+  .vi {
+    margin-top: 10px; font-size: 1rem; color: #b0552e; font-style: italic;
+    display: none;
+  }
+  body.vn-on .vi { display: block; }
+  .hint-text { margin-top: 12px; font-family: Consolas, monospace; letter-spacing: .2em;
+    color: var(--muted); min-height: 1.2em; }
+
+  .answer-row { display: flex; gap: 10px; margin-top: 22px; }
+  #answer {
+    flex: 1; font-size: 1.1rem; padding: 12px 16px; border-radius: 10px;
+    border: 2px solid var(--line); outline: none; background: #fafbfe;
+    transition: border-color .15s, background .15s;
+  }
+  #answer:focus { border-color: var(--accent); }
+  #answer.correct { border-color: var(--green); background: var(--green-bg); }
+  #answer.wrong   { border-color: var(--red);   background: var(--red-bg);
+    animation: shake .35s; }
+  #answer.almost  { border-color: var(--yellow); background: var(--yellow-bg); }
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    25% { transform: translateX(-6px); } 75% { transform: translateX(6px); }
+  }
+  button {
+    font-size: .9rem; padding: 11px 18px; border-radius: 10px; border: none;
+    cursor: pointer; font-weight: 600; transition: filter .15s;
+  }
+  button:hover { filter: brightness(.95); }
+  #checkBtn { background: var(--accent); color: #fff; }
+  .secondary-row { display: flex; gap: 10px; margin-top: 12px; }
+  .secondary-row button {
+    background: transparent; color: var(--muted); border: 1px solid var(--line);
+    font-weight: 500; font-size: .82rem; padding: 8px 14px;
+  }
+  kbd {
+    font-family: Consolas, monospace; font-size: .68rem; color: var(--muted);
+    background: var(--bg); border: 1px solid var(--line); border-bottom-width: 2px;
+    border-radius: 4px; padding: 1px 5px; margin-left: 6px;
+  }
+  #feedback { margin-top: 16px; min-height: 1.6em; font-size: .95rem; }
+  #feedback.good { color: var(--green); font-weight: 600; }
+  #feedback.bad { color: var(--red); }
+  #feedback.close { color: var(--yellow); }
+  .source-tag { margin-top: 20px; font-size: .75rem; color: var(--muted); }
+
+  #done {
+    display: none; text-align: center; padding: 30px 0 10px;
+  }
+  #done h2 { font-size: 1.4rem; margin-bottom: 10px; }
+  #done p { color: var(--muted); margin-bottom: 20px; }
+  #done button { background: var(--accent); color: #fff; }
+  footer { margin-top: 18px; font-size: .75rem; color: var(--muted); text-align: center; }
+
+  [hidden] { display: none !important; }
+  .mode-switch {
+    display: flex; background: var(--card); border: 1px solid var(--line);
+    border-radius: 999px; padding: 3px;
+  }
+  .seg {
+    background: transparent; color: var(--muted); padding: 5px 12px;
+    font-size: .85rem; border-radius: 999px;
+  }
+  .seg.on { background: var(--accent); color: #fff; }
+
+  #reader { display: flex; flex-direction: column; gap: 14px; }
+  .reader-bar { display: flex; gap: 8px; }
+  #passageSelect { flex: 1; min-width: 0; padding: 9px 10px; }
+  #topicFilter { padding: 9px 10px; }
+  .reader-bar button { padding: 8px 12px; font-size: .85rem; }
+  #deleteBtn { background: transparent; color: var(--red); border: 1px solid var(--line); }
+  #nextBtn { background: var(--accent); color: #fff; }
+  .passage-meta { font-size: .8rem; color: var(--muted); }
+  .reader-hint { font-size: .8rem; color: var(--muted); }
+  #readText p { font-size: 1.08rem; line-height: 1.75; margin-bottom: 14px; }
+  #readText p:last-child { margin-bottom: 0; }
+  .trans-pop {
+    position: fixed; z-index: 11; max-width: 340px; padding: 10px 14px;
+    background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--accent);
+    border-radius: 8px; box-shadow: 0 6px 18px rgba(28,35,51,.2);
+  }
+  .trans-out { font-size: 1rem; line-height: 1.5; }
+  .trans-out.bad { color: var(--red); font-size: .85rem; }
+  .trans-out.bad + #popSpeak { display: none; }
+  #popSpeak { margin-top: 8px; padding: 4px 10px; font-size: .8rem; }
+  #selBtn, #spkBtn {
+    position: fixed; transform: translateX(-50%); z-index: 10;
+    background: var(--ink); color: #fff; padding: 6px 12px; font-size: .8rem;
+    border-radius: 8px; box-shadow: 0 4px 12px rgba(28,35,51,.25);
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>📘 Vocab Trainer</h1>
+  <div class="mode-switch">
+    <button class="seg on" id="modeQuiz">🧠 Ôn từ</button>
+    <button class="seg" id="modeRead">📖 Đọc</button>
+  </div>
+  <span class="pill">Due: <b id="statDue">0</b></span>
+  <span class="pill">Mastered: <b id="statMastered">0</b>/<b id="statTotal">0</b></span>
+  <select id="sourceFilter" title="Practice words from"></select>
+  <div class="toggle" id="vnToggle" title="Show Vietnamese meaning (Ctrl+Q)">
+    <span>🇻🇳 VN</span><span class="knob"></span><kbd>Ctrl+Q</kbd>
+  </div>
+</header>
+
+<div id="card">
+  <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+
+  <div id="quiz">
+    <span class="pos" id="pos"></span>
+    <div class="definition" id="definition"></div>
+    <div class="vi" id="viMeaning"></div>
+    <div class="hint-text" id="hintText"></div>
+
+    <div class="answer-row">
+      <input id="answer" type="text" autocomplete="off" spellcheck="false"
+             placeholder="Type the word, press Enter…">
+      <button id="checkBtn">Check</button>
+    </div>
+    <div class="secondary-row">
+      <button id="hintBtn">💡 Hint<kbd>Ctrl+H</kbd></button>
+      <button id="revealBtn">👁 Show answer<kbd>Ctrl+Enter</kbd></button>
+      <button id="skipBtn">⏭ Skip<kbd>Ctrl+→</kbd></button>
+    </div>
+    <div id="feedback"></div>
+    <div class="source-tag" id="sourceTag"></div>
+  </div>
+
+  <div id="done">
+    <h2>🎉 Session complete!</h2>
+    <p id="doneStats"></p>
+    <button id="againBtn">Practice all words anyway</button>
+  </div>
+
+  <div id="reader" hidden>
+    <div class="reader-bar">
+      <select id="topicFilter" title="Day or topic"></select>
+      <select id="passageSelect" title="Choose a passage"></select>
+    </div>
+    <div class="reader-bar">
+      <button id="nextBtn" title="Random passage from the selected day / topic">▶ Continue</button>
+      <button id="deleteBtn" title="Delete this passage from the database">🗑 Xóa bài này</button>
+    </div>
+    <div class="passage-meta" id="passageMeta"></div>
+    <div class="reader-hint">Bôi đen từ hoặc cụm từ chưa biết, rồi bấm <b>🌐 Dịch</b> (hoặc phím <kbd>T</kbd>).</div>
+    <div id="readText"></div>
+  </div>
+</div>
+<button id="selBtn" hidden>🌐 Dịch<kbd>T</kbd></button>
+<button id="spkBtn" hidden>🔊 Nghe<kbd>R</kbd></button>
+<div class="trans-pop" id="transPop" hidden>
+  <div class="trans-out" id="transOut"></div>
+  <button id="popSpeak">🔊 Nghe</button>
+</div>
+
+<footer>
+  Enter = check · Ctrl+Q = 🇻🇳 mode · Ctrl+H = hint · Ctrl+Enter = show answer · Ctrl+→ = skip<br>
+  Words you miss come back sooner · words you know come back in 1 → 2 → 4 → 7 days
+</footer>
+
+<script src="dictionary.js"></script>
+<script>
+(function () {
+  if (!window.VOCAB || !window.VOCAB.length) {
+    document.getElementById("quiz").innerHTML =
+      "<p>No dictionary found. Run <code>python add_vocab.py your_file.md</code> first.</p>";
+    return;
+  }
+
+  const INTERVALS = [0, 1, 2, 4, 7];          // days until next review, by box 0..4
+  const MASTER_BOX = 4;
+  const PROGRESS_KEY = "vocabTrainerProgress";
+  const VN_KEY = "vocabTrainerVN";
+
+  const $ = (id) => document.getElementById(id);
+  const todayStr = () => new Date().toISOString().slice(0, 10);
+
+  let progress = JSON.parse(localStorage.getItem(PROGRESS_KEY) || "{}");
+  const saveProgress = () =>
+    localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
+
+  const stateOf = (w) =>
+    progress[w.word.toLowerCase()] || { box: 0, due: todayStr() };
+
+  // ---------- header: source filter + VN toggle ----------
+  const naturalCmp = (a, b) => a.localeCompare(b, undefined, { numeric: true });
+  const allSources = [...new Set(VOCAB.flatMap((w) => w.source.split(", ")))];
+  const dailySources = allSources.filter((s) => /^Day/i.test(s)).sort(naturalCmp);
+  const weekSources = allSources.filter((s) => !/^Day/i.test(s)).sort(naturalCmp);
+  const optionsFor = (list) =>
+    list.map((s) => `<option>${s}</option>`).join("");
+  $("sourceFilter").innerHTML =
+    '<option value="">All sources</option>' +
+    (dailySources.length ? `<optgroup label="Daily lessons">${optionsFor(dailySources)}</optgroup>` : "") +
+    (weekSources.length ? `<optgroup label="Weekly summaries">${optionsFor(weekSources)}</optgroup>` : "");
+
+  if (localStorage.getItem(VN_KEY) === "1") {
+    document.body.classList.add("vn-on");
+    $("vnToggle").classList.add("on");
+  }
+  $("vnToggle").onclick = () => {
+    document.body.classList.toggle("vn-on");
+    $("vnToggle").classList.toggle("on");
+    localStorage.setItem(VN_KEY, document.body.classList.contains("vn-on") ? "1" : "0");
+  };
+
+  // ---------- text-to-speech: the Python server (app.py) makes the audio ----------
+  let ttsAudio = null;
+
+  // Resolves true if the audio played, false if the server could not make it
+  function speak(text) {
+    if (ttsAudio) ttsAudio.pause();                   // cut off whatever was playing
+    ttsAudio = new Audio("/speak?text=" + encodeURIComponent(text));
+    return ttsAudio.play().then(() => true, () => false);
+  }
+
+  // ---------- session ----------
+  let queue = [], sessionTotal = 0, sessionCorrect = 0;
+  let current = null, attempted = false, revealed = false;
+
+  function filteredWords() {
+    const src = $("sourceFilter").value;
+    return VOCAB.filter((w) => !src || w.source.split(", ").includes(src));
+  }
+  function dueWords() {
+    return filteredWords().filter((w) => stateOf(w).due <= todayStr());
+  }
+  function shuffle(a) {
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function updateStats() {
+    const words = filteredWords();
+    $("statTotal").textContent = words.length;
+    $("statDue").textContent = dueWords().length;
+    $("statMastered").textContent =
+      words.filter((w) => stateOf(w).box >= MASTER_BOX).length;
+  }
+
+  function startSession(allWords) {
+    queue = shuffle(allWords ? filteredWords().slice() : dueWords());
+    sessionTotal = queue.length;
+    sessionCorrect = 0;
+    if (!queue.length) return showDone(true);
+    $("done").style.display = "none";
+    $("quiz").style.display = "block";
+    nextWord();
+  }
+
+  function nextWord() {
+    updateStats();
+    $("progressFill").style.width =
+      sessionTotal ? (100 * (sessionTotal - queue.length)) / sessionTotal + "%" : "0";
+    if (!queue.length) return showDone(false);
+    current = queue.shift();
+    attempted = false; revealed = false;
+    $("pos").textContent = current.pos || "word";
+    $("definition").textContent = current.en;
+    $("viMeaning").textContent = current.vi ? "(" + current.vi + ")" : "";
+    $("hintText").textContent = "";
+    $("hintText").dataset.count = 0;
+    $("sourceTag").textContent = "from " + current.source;
+    const input = $("answer");
+    input.value = ""; input.className = ""; input.disabled = false;
+    $("feedback").textContent = ""; $("feedback").className = "";
+    input.focus();
+  }
+
+  function showDone(nothingDue) {
+    $("quiz").style.display = "none";
+    $("done").style.display = "block";
+    $("progressFill").style.width = "100%";
+    $("done").querySelector("h2").textContent =
+      nothingDue ? "✅ Nothing due right now!" : "🎉 Session complete!";
+    $("doneStats").textContent = nothingDue
+      ? "All words in this filter are scheduled for later. You can still practice."
+      : `First-try correct: ${sessionCorrect} / ${sessionTotal}`;
+    updateStats();
+  }
+
+  // Levenshtein distance capped at 2 — for "almost" detection
+  function editDistance(a, b) {
+    if (Math.abs(a.length - b.length) > 1) return 2;
+    const dp = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+    for (let j = 1; j <= b.length; j++) dp[0][j] = j;
+    for (let i = 1; i <= a.length; i++)
+      for (let j = 1; j <= b.length; j++)
+        dp[i][j] = Math.min(
+          dp[i - 1][j] + 1, dp[i][j - 1] + 1,
+          dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+        );
+    return dp[a.length][b.length];
+  }
+
+  function grade(correctFirstTry) {
+    const key = current.word.toLowerCase();
+    const st = stateOf(current);
+    if (correctFirstTry) {
+      st.box = Math.min(st.box + 1, MASTER_BOX);
+    } else {
+      st.box = 0;
+    }
+    const next = new Date();
+    next.setDate(next.getDate() + INTERVALS[st.box]);
+    st.due = next.toISOString().slice(0, 10);
+    progress[key] = st;
+    saveProgress();
+  }
+
+  function advance(delayMs) {
+    $("answer").disabled = true;
+    setTimeout(nextWord, delayMs);
+  }
+
+  function check() {
+    const input = $("answer");
+    const guess = input.value.trim().toLowerCase();
+    if (!guess || input.disabled) return;
+    const target = current.word.toLowerCase();
+
+    if (guess === target) {
+      input.className = "correct";
+      $("feedback").className = "good";
+      $("feedback").textContent =
+        "✓ " + current.word + (current.vi ? "  —  " + current.vi : "");
+      if (!attempted && !revealed) { sessionCorrect++; grade(true); }
+      else grade(false);
+      speak(current.word);
+      advance(1100);
+    } else if (editDistance(guess, target) === 1) {
+      input.className = "almost";
+      $("feedback").className = "close";
+      $("feedback").textContent = "Almost! Check your spelling.";
+    } else {
+      attempted = true;
+      input.className = "wrong";
+      $("feedback").className = "bad";
+      $("feedback").textContent = "✗ Not quite — try again, use a hint, or show the answer.";
+      input.select();
+    }
+  }
+
+  function reveal() {
+    if ($("answer").disabled) return;
+    revealed = true;
+    $("answer").value = current.word;
+    $("answer").className = "wrong";
+    $("feedback").className = "bad";
+    $("feedback").textContent =
+      "Answer: " + current.word + (current.vi ? "  —  " + current.vi : "") +
+      ". It will come back this session.";
+    grade(false);
+    queue.splice(Math.min(3, queue.length), 0, current);  // re-ask a few cards later
+    sessionTotal++;
+    speak(current.word);
+    advance(1800);
+  }
+
+  function hint() {
+    if ($("answer").disabled) return;
+    const w = current.word;
+    const shown = Math.min(w.length, (+$("hintText").dataset.count || 0) + 1);
+    $("hintText").dataset.count = shown;
+    $("hintText").textContent =
+      w.slice(0, shown) + " " + Array(Math.max(0, w.length - shown)).fill("_").join(" ");
+    $("answer").focus();
+  }
+
+  $("checkBtn").onclick = check;
+  $("answer").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.ctrlKey) check();
+  });
+
+  // Global keyboard shortcuts
+  document.addEventListener("keydown", (e) => {
+    if (!e.ctrlKey || e.altKey || e.shiftKey) return;
+    const quizVisible = $("quiz").style.display !== "none";
+    switch (e.key) {
+      case "q": case "Q":
+        e.preventDefault(); $("vnToggle").click(); break;
+      case "h": case "H":
+        if (quizVisible) { e.preventDefault(); hint(); } break;
+      case "Enter":
+        if (quizVisible) { e.preventDefault(); reveal(); } break;
+      case "ArrowRight":
+        if (quizVisible) { e.preventDefault(); $("skipBtn").click(); } break;
+    }
+  });
+  $("revealBtn").onclick = reveal;
+  $("hintBtn").onclick = hint;
+  $("skipBtn").onclick = () => { if (!$("answer").disabled) { grade(false); nextWord(); } };
+  $("againBtn").onclick = () => startSession(true);
+  $("sourceFilter").onchange = () => startSession(false);
+
+  // ---------- reading mode: select text → translate (the Python server does the work) ----------
+  let passages = [];          // every passage in passages.jsonl (loaded from the server)
+  let shown = [];             // the ones matching the day filter
+  let currentId = null;
+  let mode = "quiz", selText = "", popText = "", transSeq = 0;
+
+  async function translate(text) {
+    const res = await fetch("/translate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    return data.text;
+  }
+
+  const selBtn = $("selBtn");
+  const readText = $("readText");
+  const transPop = $("transPop");
+  const transOut = $("transOut");
+  const spkBtn = $("spkBtn");
+  const hideSelBtn = () => { selBtn.hidden = true; spkBtn.hidden = true; };
+  const hideTrans = () => { transPop.hidden = true; };
+  let selRect = null;
+
+  function onSelectionChange() {
+    const sel = window.getSelection();
+    const text = sel.toString().trim();
+    if (mode !== "read" || !text || !sel.rangeCount ||
+        !readText.contains(sel.getRangeAt(0).commonAncestorContainer)) return hideSelBtn();
+    selRect = sel.getRangeAt(0).getBoundingClientRect();
+    selText = text;
+    const mid = selRect.left + selRect.width / 2;
+    selBtn.style.left = mid - 50 + "px";
+    spkBtn.style.left = mid + 50 + "px";
+    selBtn.style.top = spkBtn.style.top = selRect.bottom + 6 + "px";
+    selBtn.hidden = spkBtn.hidden = false;
+  }
+
+  async function runSpeak(text) {
+    if (!(await speak(text))) showTrans("Không đọc được. Hãy kiểm tra <code>python app.py</code> đang chạy.", true);
+  }
+
+  // Put the translation right under the highlighted text (above it if there is no room)
+  function placeTrans() {
+    if (!selRect) return;
+    const w = transPop.offsetWidth, h = transPop.offsetHeight;
+    const left = Math.min(Math.max(8, selRect.left), window.innerWidth - w - 8);
+    let top = selRect.bottom + 8;
+    if (top + h > window.innerHeight - 8) top = Math.max(8, selRect.top - h - 8);
+    transPop.style.left = left + "px";
+    transPop.style.top = top + "px";
+  }
+
+  function showTrans(content, isBad) {
+    transOut.className = isBad ? "trans-out bad" : "trans-out";
+    if (isBad) transOut.innerHTML = content; else transOut.textContent = content;
+    transPop.hidden = false;
+    placeTrans();
+  }
+
+  async function runTranslate() {
+    hideSelBtn();
+    const text = popText = selText;
+    const seq = ++transSeq;
+    showTrans("Đang dịch…", false);
+    try {
+      const result = await translate(text);
+      if (seq === transSeq) showTrans(result, false);
+    } catch (err) {
+      if (seq === transSeq) showTrans(err.message || "Không dịch được.", true);
+    }
+  }
+
+  async function loadPassages() {
+    passages = await (await fetch("/api/passages")).json();
+    // filter values: "topic:Food" for free passages, "day:Day 2" for the daily lessons
+    const opts = (kind, list) => [...new Set(list)].map((v) => `<option value="${kind}:${v}">${v}</option>`).join("");
+    const free = passages.filter((p) => !p.day), daily = passages.filter((p) => p.day);
+    $("topicFilter").innerHTML = '<option value="">All passages</option>' +
+      `<optgroup label="Bài học theo ngày">${opts("day", daily.map((p) => p.day).sort((a, b) =>
+        a.localeCompare(b, undefined, { numeric: true })))}</optgroup>` +
+      `<optgroup label="Chủ đề chung">${opts("topic", free.map((p) => p.topic).sort())}</optgroup>`;
+    applyTopicFilter();
+  }
+
+  // Fill the passage dropdown from the topic filter and show a random passage from it
+  function applyTopicFilter() {
+    const [kind, value] = $("topicFilter").value.split(/:(.*)/s);   // split on the first ":" only
+    shown = passages.filter((p) => !value || (kind === "day" ? p.day : p.topic) === value);
+    $("passageSelect").innerHTML = "";
+    shown.forEach((p) => $("passageSelect").add(new Option((p.day ? p.day + " · " : "") + p.title, p.id)));
+    showPassage(null);
+  }
+
+  // id = null → pick a random passage (different from the current one when possible)
+  function showPassage(id) {
+    readText.textContent = "";
+    hideSelBtn();
+    hideTrans();
+    if (id === null) {
+      const others = shown.filter((p) => p.id !== currentId);
+      const pool = others.length ? others : shown;
+      id = pool.length ? pool[Math.floor(Math.random() * pool.length)].id : null;
+    }
+    currentId = id;
+    const p = shown.find((q) => q.id === id);
+    $("deleteBtn").disabled = $("nextBtn").disabled = !p;
+    if (!p) {
+      $("passageMeta").textContent = "";
+      readText.textContent = "Chưa có bài đọc nào.";
+      return;
+    }
+    $("passageSelect").value = id;
+    $("passageMeta").textContent = [p.topic, p.level, p.day].filter(Boolean).join(" · ");
+    p.paragraphs.forEach((text) => {
+      const el = document.createElement("p");
+      el.textContent = text;
+      readText.appendChild(el);
+    });
+  }
+
+  async function deletePassage() {
+    const p = passages.find((q) => q.id === currentId);
+    if (!p || !confirm(`Xóa bài "${p.title}" khỏi database?`)) return;
+    const res = await fetch("/api/passages/" + encodeURIComponent(p.id), { method: "DELETE" });
+    if (!res.ok) return alert("Không xóa được.");
+    passages = passages.filter((q) => q.id !== p.id);
+    currentId = null;
+    applyTopicFilter();
+  }
+
+  function setMode(next) {
+    if (next === mode) return;
+    mode = next;
+    const reading = mode === "read";
+    $("modeQuiz").classList.toggle("on", !reading);
+    $("modeRead").classList.toggle("on", reading);
+    $("sourceFilter").hidden = reading;
+    $("reader").hidden = !reading;
+    $("quiz").style.display = "none";
+    $("done").style.display = "none";
+    hideSelBtn();
+    hideTrans();
+    if (reading) {
+      if (!passages.length) loadPassages().catch(() => {
+        readText.textContent = "Không tải được bài đọc. Hãy chạy python app.py rồi mở http://127.0.0.1:5000.";
+      });
+    } else {
+      startSession(false);
+    }
+  }
+
+  $("topicFilter").onchange = () => applyTopicFilter();
+  $("passageSelect").onchange = () => showPassage($("passageSelect").value);
+  $("nextBtn").onclick = () => showPassage(null);
+  $("deleteBtn").onclick = deletePassage;
+  $("modeQuiz").onclick = () => setMode("quiz");
+  $("modeRead").onclick = () => setMode("read");
+  selBtn.addEventListener("mousedown", (e) => e.preventDefault());
+  selBtn.onclick = runTranslate;
+  spkBtn.addEventListener("mousedown", (e) => e.preventDefault());
+  spkBtn.onclick = () => { const text = selText; hideSelBtn(); runSpeak(text); };
+  $("popSpeak").onclick = () => runSpeak(popText);
+  document.addEventListener("mouseup", onSelectionChange);
+  document.addEventListener("keyup", onSelectionChange);
+  document.addEventListener("scroll", () => { hideSelBtn(); hideTrans(); }, true);
+  document.addEventListener("mousedown", (e) => { if (!transPop.contains(e.target)) hideTrans(); });
+  // T = translate the highlighted text (reading mode, not while typing in a field); Esc closes the popup
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { hideTrans(); return; }
+    // e.code is the physical key, so it still works when a Vietnamese IME (Telex) is on
+    const key = { KeyT: "t", KeyR: "r" }[e.code];
+    if (mode !== "read" || !key || e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return;
+    if (e.target.closest && e.target.closest("input, textarea, select")) return;
+    onSelectionChange();
+    if (selBtn.hidden) return;
+    e.preventDefault();
+    if (key === "r") { const text = selText; hideSelBtn(); runSpeak(text); }
+    else runTranslate();
+  });
+
+  updateStats();
+  startSession(false);
+})();
+</script>
+</body>
+</html>

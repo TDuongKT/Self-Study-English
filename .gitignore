@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# TTS model files (too large for git, see README: download once)
+tts_app/*.onnx
+tts_app/*.bin
+
+# Personal / editor
+ignore_it.py
+.claude/
+.vscode/
+
+learn/*
+# Not for GitHub
+learn/
