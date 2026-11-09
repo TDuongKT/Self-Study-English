@@ -147,6 +147,17 @@
   .reader-hint { font-size: .8rem; color: var(--muted); }
   #readText p { font-size: 1.08rem; line-height: 1.75; margin-bottom: 14px; }
   #readText p:last-child { margin-bottom: 0; }
+  #vocab .reader-bar { align-items: center; }
+  #vocabPractice { margin-left: auto; background: var(--accent); color: #fff; }
+  .vocab-item { padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .vocab-item:last-child { border-bottom: none; }
+  .vocab-head { display: flex; align-items: center; gap: 8px; }
+  .vocab-word { font-weight: 700; font-size: 1.05rem; }
+  .vocab-item .pos { margin: 0; font-size: .68rem; padding: 2px 7px; }
+  .vocab-say { padding: 3px 8px; font-size: .8rem; background: transparent; border: 1px solid var(--line); }
+  .vocab-tag { margin-left: auto; font-size: .72rem; color: var(--green); }
+  .vocab-def { margin-top: 4px; line-height: 1.5; }
+  .vocab-item .vi { margin-top: 2px; font-size: .92rem; }
   .trans-pop {
     position: fixed; z-index: 11; max-width: 340px; padding: 10px 14px;
     background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--accent);
@@ -167,8 +178,9 @@
 <header>
   <h1>📘 Vocab Trainer</h1>
   <div class="mode-switch">
-    <button class="seg on" id="modeQuiz">🧠 Ôn từ</button>
-    <button class="seg" id="modeRead">📖 Đọc</button>
+    <button class="seg on" id="modeQuiz">🧠 Practice</button>
+    <button class="seg" id="modeVocab">📚 Vocab</button>
+    <button class="seg" id="modeRead">📖 Reading</button>
   </div>
   <span class="pill">Due: <b id="statDue">0</b></span>
   <span class="pill">Mastered: <b id="statMastered">0</b>/<b id="statTotal">0</b></span>
@@ -207,6 +219,14 @@
     <button id="againBtn">Practice all words anyway</button>
   </div>
 
+  <div id="vocab" hidden>
+    <div class="reader-bar">
+      <div class="passage-meta" id="vocabMeta"></div>
+      <button id="vocabPractice" title="Quiz yourself on these words">🧠 Practice these</button>
+    </div>
+    <div id="vocabList"></div>
+  </div>
+
   <div id="reader" hidden>
     <div class="reader-bar">
       <select id="topicFilter" title="Day or topic"></select>
@@ -214,22 +234,23 @@
     </div>
     <div class="reader-bar">
       <button id="nextBtn" title="Random passage from the selected day / topic">▶ Continue</button>
-      <button id="deleteBtn" title="Delete this passage from the database">🗑 Xóa bài này</button>
+      <button id="deleteBtn" title="Delete this passage from the database">🗑 Delete passage</button>
     </div>
     <div class="passage-meta" id="passageMeta"></div>
-    <div class="reader-hint">Bôi đen từ hoặc cụm từ chưa biết, rồi bấm <b>🌐 Dịch</b> (hoặc phím <kbd>T</kbd>).</div>
+    <div class="reader-hint">Highlight an unknown word or phrase, then press <b>🌐 Translate</b> (<kbd>T</kbd>) or <b>🔊 Listen</b> (<kbd>R</kbd>).</div>
     <div id="readText"></div>
   </div>
 </div>
-<button id="selBtn" hidden>🌐 Dịch<kbd>T</kbd></button>
-<button id="spkBtn" hidden>🔊 Nghe<kbd>R</kbd></button>
+<button id="selBtn" hidden>🌐 Translate<kbd>T</kbd></button>
+<button id="spkBtn" hidden>🔊 Listen<kbd>R</kbd></button>
 <div class="trans-pop" id="transPop" hidden>
   <div class="trans-out" id="transOut"></div>
-  <button id="popSpeak">🔊 Nghe</button>
+  <button id="popSpeak">🔊 Listen</button>
 </div>
 
 <footer>
   Enter = check · Ctrl+Q = 🇻🇳 mode · Ctrl+H = hint · Ctrl+Enter = show answer · Ctrl+→ = skip<br>
+  Highlight English text anywhere: T = translate · R = listen<br>
   Words you miss come back sooner · words you know come back in 1 → 2 → 4 → 7 days
 </footer>
 
@@ -469,9 +490,9 @@
   $("hintBtn").onclick = hint;
   $("skipBtn").onclick = () => { if (!$("answer").disabled) { grade(false); nextWord(); } };
   $("againBtn").onclick = () => startSession(true);
-  $("sourceFilter").onchange = () => startSession(false);
+  $("sourceFilter").onchange = () => (mode === "vocab" ? showVocab() : startSession(false));
 
-  // ---------- reading mode: select text → translate (the Python server does the work) ----------
+  // ---------- select English text anywhere → translate / listen (the Python server does the work) ----------
   let passages = [];          // every passage in passages.jsonl (loaded from the server)
   let shown = [];             // the ones matching the day filter
   let currentId = null;
@@ -497,22 +518,29 @@
   const hideTrans = () => { transPop.hidden = true; };
   let selRect = null;
 
+  // Latin letters but no Vietnamese ones, so the Vietnamese meanings on the page are skipped
+  const isEnglish = (text) => /[a-z]/i.test(text) &&
+    !/[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(text);
+
   function onSelectionChange() {
     const sel = window.getSelection();
     const text = sel.toString().trim();
-    if (mode !== "read" || !text || !sel.rangeCount ||
-        !readText.contains(sel.getRangeAt(0).commonAncestorContainer)) return hideSelBtn();
+    if (!isEnglish(text) || !sel.rangeCount) return hideSelBtn();
+    // not inside the popup, the floating buttons or a text field
+    const node = sel.getRangeAt(0).commonAncestorContainer;
+    const el = node.nodeType === 1 ? node : node.parentElement;
+    if (el.closest("#transPop, #selBtn, #spkBtn, input, textarea, select")) return hideSelBtn();
     selRect = sel.getRangeAt(0).getBoundingClientRect();
     selText = text;
     const mid = selRect.left + selRect.width / 2;
-    selBtn.style.left = mid - 50 + "px";
-    spkBtn.style.left = mid + 50 + "px";
+    selBtn.style.left = mid - 62 + "px";
+    spkBtn.style.left = mid + 62 + "px";
     selBtn.style.top = spkBtn.style.top = selRect.bottom + 6 + "px";
     selBtn.hidden = spkBtn.hidden = false;
   }
 
   async function runSpeak(text) {
-    if (!(await speak(text))) showTrans("Không đọc được. Hãy kiểm tra <code>python app.py</code> đang chạy.", true);
+    if (!(await speak(text))) showTrans("Could not play audio. Check that <code>python app.py</code> is running.", true);
   }
 
   // Put the translation right under the highlighted text (above it if there is no room)
@@ -537,12 +565,12 @@
     hideSelBtn();
     const text = popText = selText;
     const seq = ++transSeq;
-    showTrans("Đang dịch…", false);
+    showTrans("Translating…", false);
     try {
       const result = await translate(text);
       if (seq === transSeq) showTrans(result, false);
     } catch (err) {
-      if (seq === transSeq) showTrans(err.message || "Không dịch được.", true);
+      if (seq === transSeq) showTrans(err.message || "Translation failed.", true);
     }
   }
 
@@ -552,9 +580,9 @@
     const opts = (kind, list) => [...new Set(list)].map((v) => `<option value="${kind}:${v}">${v}</option>`).join("");
     const free = passages.filter((p) => !p.day), daily = passages.filter((p) => p.day);
     $("topicFilter").innerHTML = '<option value="">All passages</option>' +
-      `<optgroup label="Bài học theo ngày">${opts("day", daily.map((p) => p.day).sort((a, b) =>
+      `<optgroup label="Daily lessons">${opts("day", daily.map((p) => p.day).sort((a, b) =>
         a.localeCompare(b, undefined, { numeric: true })))}</optgroup>` +
-      `<optgroup label="Chủ đề chung">${opts("topic", free.map((p) => p.topic).sort())}</optgroup>`;
+      `<optgroup label="General topics">${opts("topic", free.map((p) => p.topic).sort())}</optgroup>`;
     applyTopicFilter();
   }
 
@@ -582,7 +610,7 @@
     $("deleteBtn").disabled = $("nextBtn").disabled = !p;
     if (!p) {
       $("passageMeta").textContent = "";
-      readText.textContent = "Chưa có bài đọc nào.";
+      readText.textContent = "No passages yet.";
       return;
     }
     $("passageSelect").value = id;
@@ -596,30 +624,63 @@
 
   async function deletePassage() {
     const p = passages.find((q) => q.id === currentId);
-    if (!p || !confirm(`Xóa bài "${p.title}" khỏi database?`)) return;
+    if (!p || !confirm(`Delete "${p.title}" from the database?`)) return;
     const res = await fetch("/api/passages/" + encodeURIComponent(p.id), { method: "DELETE" });
-    if (!res.ok) return alert("Không xóa được.");
+    if (!res.ok) return alert("Could not delete the passage.");
     passages = passages.filter((q) => q.id !== p.id);
     currentId = null;
     applyTopicFilter();
   }
 
+  // ---------- vocab mode: every word of the selected day / week, to study before the quiz ----------
+  function showVocab() {
+    updateStats();
+    const words = filteredWords();
+    const mastered = words.filter((w) => stateOf(w).box >= MASTER_BOX).length;
+    $("vocabMeta").textContent =
+      `${$("sourceFilter").value || "All sources"} · ${words.length} words · ${mastered} mastered`;
+    $("progressFill").style.width = words.length ? (100 * mastered) / words.length + "%" : "0";
+    const list = $("vocabList");
+    list.textContent = "";
+    words.forEach((w) => {
+      const item = document.createElement("div");
+      item.className = "vocab-item";
+      item.innerHTML = `<div class="vocab-head"><span class="vocab-word"></span><span class="pos"></span>
+        <button class="vocab-say" title="Listen">🔊</button><span class="vocab-tag"></span></div>
+        <div class="vocab-def"></div><div class="vi"></div>`;
+      item.querySelector(".vocab-word").textContent = w.word;
+      item.querySelector(".pos").textContent = w.pos || "word";
+      item.querySelector(".pos").hidden = !w.pos;
+      item.querySelector(".vocab-tag").textContent = stateOf(w).box >= MASTER_BOX ? "✓ mastered" : "";
+      item.querySelector(".vocab-def").textContent = w.en;
+      item.querySelector(".vi").textContent = w.vi || "";
+      item.querySelector(".vocab-say").onclick = () => runSpeak(w.word);
+      list.appendChild(item);
+    });
+  }
+
   function setMode(next) {
     if (next === mode) return;
     mode = next;
-    const reading = mode === "read";
-    $("modeQuiz").classList.toggle("on", !reading);
+    const reading = mode === "read", vocab = mode === "vocab";
+    $("modeQuiz").classList.toggle("on", mode === "quiz");
+    $("modeVocab").classList.toggle("on", vocab);
     $("modeRead").classList.toggle("on", reading);
     $("sourceFilter").hidden = reading;
     $("reader").hidden = !reading;
+    $("vocab").hidden = !vocab;
     $("quiz").style.display = "none";
     $("done").style.display = "none";
     hideSelBtn();
     hideTrans();
     if (reading) {
       if (!passages.length) loadPassages().catch(() => {
-        readText.textContent = "Không tải được bài đọc. Hãy chạy python app.py rồi mở http://127.0.0.1:5000.";
+        readText.textContent = "Could not load passages. Run python app.py, then open http://127.0.0.1:5000.";
       });
+    } else if (vocab) {
+      // a whole-dictionary list is long, so start on the latest daily lesson
+      if (!$("sourceFilter").value && dailySources.length) $("sourceFilter").value = dailySources.at(-1);
+      showVocab();
     } else {
       startSession(false);
     }
@@ -631,6 +692,8 @@
   $("deleteBtn").onclick = deletePassage;
   $("modeQuiz").onclick = () => setMode("quiz");
   $("modeRead").onclick = () => setMode("read");
+  $("modeVocab").onclick = () => setMode("vocab");
+  $("vocabPractice").onclick = () => setMode("quiz");
   selBtn.addEventListener("mousedown", (e) => e.preventDefault());
   selBtn.onclick = runTranslate;
   spkBtn.addEventListener("mousedown", (e) => e.preventDefault());
@@ -640,12 +703,12 @@
   document.addEventListener("keyup", onSelectionChange);
   document.addEventListener("scroll", () => { hideSelBtn(); hideTrans(); }, true);
   document.addEventListener("mousedown", (e) => { if (!transPop.contains(e.target)) hideTrans(); });
-  // T = translate the highlighted text (reading mode, not while typing in a field); Esc closes the popup
+  // T = translate, R = listen to the highlighted text (not while typing in a field); Esc closes the popup
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") { hideTrans(); return; }
     // e.code is the physical key, so it still works when a Vietnamese IME (Telex) is on
     const key = { KeyT: "t", KeyR: "r" }[e.code];
-    if (mode !== "read" || !key || e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return;
+    if (!key || e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return;
     if (e.target.closest && e.target.closest("input, textarea, select")) return;
     onSelectionChange();
     if (selBtn.hidden) return;
