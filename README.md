@@ -94,15 +94,15 @@ Reading-mode translation and the spoken pronunciation both run in `tts_app/app.p
 
 One-time setup (the venv and model files are not in git):
 
-```powershell
-cd tts_app
-python -m venv .venv
-.venv\Scripts\python -m pip install flask requests soundfile kokoro-onnx "onnxruntime-gpu[cuda,cudnn]"
-$u = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0"
-curl.exe -L -O "$u/kokoro-v1.0.onnx"; curl.exe -L -O "$u/voices-v1.0.bin"
-```
+- **Windows:** double-click `tts_app\setup.bat`, then `tts_app\start.bat` to run the app.
+- **macOS / Linux:** `bash tts_app/setup.sh`.
 
-(No NVIDIA GPU? Use `onnxruntime` instead of `onnxruntime-gpu[cuda,cudnn]`.) Then run:
+The setup installs whatever the laptop is missing: Git Bash (Windows, via winget), Python 3.12
+(if no Python 3.10-3.12 is found; per-user, no admin rights), the Visual C++ runtime (Windows;
+asks for permission once) and curl. It then creates the venv, installs the libraries (CUDA builds
+when an NVIDIA GPU with its driver is present, otherwise CPU), downloads the Kokoro files and
+converts the VinAI translation model to `tts_app/vinai-en2vi-ct2/` (that one-off conversion uses a
+temporary venv with PyTorch, deleted afterwards). It is safe to run again. To start by hand:
 
 ```powershell
 cd tts_app
@@ -111,9 +111,8 @@ cd tts_app
 
 Then open **http://127.0.0.1:5000** (the server also serves the page — no `http.server` needed).
 
-- Translation: Hy-MT through Ollama (keep Ollama running).
+- Translation: [VinAI Translate en→vi v2](https://huggingface.co/vinai/vinai-translate-en2vi-v2) (mBART, fine-tuned for English→Vietnamese; AGPL-3.0), run locally from `tts_app/vinai-en2vi-ct2/` with CTranslate2 (int8) on the GPU, or the CPU if there is none. Passages are split into sentences and translated as one batch. The terminal prints `Translator running on CUDA` or `CPU`.
 - Speech: Kokoro-82M, run locally from `tts_app/kokoro-v1.0.onnx` + `voices-v1.0.bin`. Runs on the NVIDIA GPU (CUDA) when available, otherwise on the CPU. The terminal prints `Kokoro running on CUDA` or `CPU` at start-up.
-- Translation (Ollama) also uses the GPU by default and falls back to the CPU by itself.
 - **Quiz mode** — the word is spoken when you get it right or show the answer.
 - **Reading mode** — highlight text, then **🌐 Dịch** (`T`) or **🔊 Nghe** (`S`).
 
@@ -156,3 +155,6 @@ Clearing browser data resets your levels — the dictionary itself is safe in
   Your practice progress (levels/due dates) lives separately in the browser and is untouched.
 - If a word was parsed wrong, fix the source `.md` file and rebuild, rather than editing
   `dictionary.json` by hand — a rebuild would overwrite manual edits.
+
+
+

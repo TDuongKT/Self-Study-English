@@ -5,7 +5,9 @@ __pycache__/
 
 # TTS model files (too large for git, see README: download once)
 tts_app/*.onnx
+tts_app/*.gguf
 tts_app/*.bin
+tts_app/vinai-en2vi-ct2/
 
 # Personal / editor
 ignore_it.py
